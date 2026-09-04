@@ -1,0 +1,18 @@
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import { CheckCircle2, Circle } from 'lucide-react'
+import { Button, Card, Empty, Input, Loading, PageHeader } from '../components/ui'
+import { addTask, getTasks, toggleTask } from '../lib/data'
+import { useAuth } from '../lib/auth'
+import type { Task } from '../lib/types'
+
+const isoToday = () => new Date().toLocaleDateString('en-CA')
+export function PlannerPage() {
+  const { user } = useAuth(); const [tasks, setTasks] = useState<Task[] | null>(null); const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [date, setDate] = useState(isoToday()); const [priority, setPriority] = useState<Task['priority']>('medium'); const [status, setStatus] = useState('')
+  const refresh = () => { if (user) getTasks(user.id).then(setTasks).catch(e => setStatus(e.message)) }; useEffect(refresh, [user])
+  if (!tasks) return <Loading />
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!user) return; try { await addTask(user.id, { title, description: description || null, due_date: date, priority }); setTitle(''); setDescription(''); refresh() } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add task.') } }
+  const today = tasks.filter(task => task.due_date === isoToday())
+  return <div className="page"><PageHeader eyebrow="BUILD CONSISTENCY" title="Planner" /><div className="planner-grid"><Card title="Add a task"><form onSubmit={submit} className="stack"><label>What do you want to do?<Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Review data structures" required /></label><label>Description (optional)<textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Add context if it helps." rows={3} /></label><div className="form-grid"><label>Date<Input type="date" value={date} onChange={e => setDate(e.target.value)} required /></label><label>Priority<select value={priority} onChange={e => setPriority(e.target.value as Task['priority'])}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label></div><Button>Add task</Button>{status && <p className="form-message">{status}</p>}</form></Card><Card title="Today"><TaskList tasks={today} onToggle={async task => { try { await toggleTask(task.id, !task.is_completed); refresh() } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update task.') } }} emptyText="Add a task dated today to see it here." /></Card></div><Card title="All scheduled tasks"><TaskList tasks={tasks} onToggle={async task => { try { await toggleTask(task.id, !task.is_completed); refresh() } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update task.') } }} emptyText="Your schedule is clear. Add your first task above." /></Card></div>
+}
+function TaskList({ tasks, onToggle, emptyText }: { tasks: Task[]; onToggle: (task: Task) => void; emptyText: string }) { if (!tasks.length) return <Empty title="Nothing here yet" text={emptyText} />; return <ul className="task-list">{tasks.map(task => <li key={task.id} className={task.is_completed ? 'done' : ''}><button onClick={() => onToggle(task)} aria-label="Toggle task">{task.is_completed ? <CheckCircle2 /> : <Circle />}</button><div><strong>{task.title}</strong><span>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div><span className={`priority ${task.priority}`}>{task.priority}</span></li>)}</ul> }

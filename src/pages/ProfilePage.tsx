@@ -1,0 +1,17 @@
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import { PageHeader, Button, Card, Input, Loading } from '../components/ui'
+import { getProfile, saveProfile } from '../lib/data'
+import { useAuth } from '../lib/auth'
+import type { Profile } from '../lib/types'
+
+const blank = (id: string): Profile => ({ id, full_name: '', avatar_url: '', college: '', branch: '', graduation_year: null, current_semester: null, skills: [], career_interests: [], career_goals: '' })
+const csv = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean)
+export function ProfilePage() {
+  const { user } = useAuth(); const [profile, setProfile] = useState<Profile | null>(null); const [status, setStatus] = useState(''); const [saving, setSaving] = useState(false)
+  useEffect(() => { if (user) getProfile(user.id).then(data => setProfile(data ?? blank(user.id))).catch(error => setStatus(error.message)) }, [user])
+  if (!profile) return <Loading />
+  const change = (key: keyof Profile, value: string | number | null | string[]) => setProfile({ ...profile, [key]: value })
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setStatus(''); try { await saveProfile(profile); setStatus('Profile saved.') } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save profile.') } finally { setSaving(false) } }
+  return <div className="page"><PageHeader eyebrow="YOUR FOUNDATION" title="Profile"><Button form="profile-form" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</Button></PageHeader><form id="profile-form" onSubmit={submit} className="profile-grid"><Card title="About you"><div className="form-grid"><label>Full name<Input value={profile.full_name ?? ''} onChange={e => change('full_name', e.target.value)} placeholder="Your full name" /></label><label>Profile photo URL<Input type="url" value={profile.avatar_url ?? ''} onChange={e => change('avatar_url', e.target.value)} placeholder="https://…" /></label><label>College<Input value={profile.college ?? ''} onChange={e => change('college', e.target.value)} placeholder="Your college name" /></label><label>Branch<Input value={profile.branch ?? ''} onChange={e => change('branch', e.target.value)} placeholder="e.g. Computer Science" /></label><label>Graduation year<Input type="number" min="2000" max="2100" value={profile.graduation_year ?? ''} onChange={e => change('graduation_year', e.target.value ? Number(e.target.value) : null)} /></label><label>Current semester<Input type="number" min="1" max="20" value={profile.current_semester ?? ''} onChange={e => change('current_semester', e.target.value ? Number(e.target.value) : null)} /></label></div></Card><Card title="Direction"><div className="form-grid single"><label>Skills<Input value={profile.skills.join(', ')} onChange={e => change('skills', csv(e.target.value))} placeholder="Separate skills with commas" /></label><label>Career interests<Input value={profile.career_interests.join(', ')} onChange={e => change('career_interests', csv(e.target.value))} placeholder="Separate interests with commas" /></label><label>Career goals<textarea value={profile.career_goals ?? ''} onChange={e => change('career_goals', e.target.value)} placeholder="Describe the goals you want to work toward." rows={5} /></label></div>{status && <p className="form-message">{status}</p>}</Card></form></div>
+}
